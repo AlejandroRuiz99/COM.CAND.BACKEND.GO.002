@@ -5,25 +5,29 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 ## [Unreleased]
 
 ### En desarrollo
-- feat-0: Project setup & foundation
+- feat-1: Repository Pattern & SQLite persistence
+
+## [0.2.0] - 2025-10-16
+
+### Added (feat-1: Repository Pattern & SQLite Persistence)
+
+- Interface `Repository` para desacoplar persistencia de lógica de negocio
+- Implementación `SQLiteRepository` con driver puro Go (sin CGO)
+- Schema SQL embedido con índices optimizados para time-series
+- Tests de integración con DB en memoria (cobertura >90%)
+- CRUD completo: SaveReading, GetLatestReadings, GetByTimeRange, SaveConfig
+
+---
 
 ## [0.1.0] - 2025-10-16
 
 ### Added (feat-0: Project Setup & Foundation)
 
-- Estructura de carpetas siguiendo Standard Go Layout
-- Inicialización de módulo Go 1.25.3 con dependencias (NATS, SQLite)
-- Tipos de dominio básicos:
-  - `Sensor`: Representación de sensor físico
-  - `SensorType`: Enum para tipos (temperature, humidity, pressure)
-  - `SensorConfig`: Configuración de sensores
-  - `SensorReading`: Lectura de sensor con timestamp y manejo de errores
-- Validación de tipos con método `Validate()` para SensorReading y SensorConfig
-- Tests unitarios con table-driven tests (TDD)
-- Esqueleto de aplicación principal con graceful shutdown
-- Documentación inicial:
-  - README
-  - CHANGELOG para seguimiento de cambios
+- Estructura del proyecto siguiendo Standard Go Layout (cmd/, internal/)
+- Tipos de dominio: Sensor, SensorType, SensorConfig, SensorReading con validación
+- Tests unitarios con table-driven tests (cobertura 100%)
+- Módulo Go 1.25.3 con dependencias NATS y SQLite
+- Main básico y documentación inicial (README, CHANGELOG)
 
 ---
 
