@@ -25,3 +25,13 @@ Prueba técnica IoT - Sistema de gestión de sensores con Go y NATS
 
 Basado en el [Standard Go Project Layout](https://github.com/golang-standards/project-layout).
 
+## Persistencia
+
+Para datos time-series de sensores IoT, lo ideal sería **TimescaleDB** (hypertables, agregaciones automáticas, retención). Sin embargo, usamos **SQLite** para esta prueba técnica por pragmatismo:
+
+- Sin dependencias externas (driver puro Go sin CGO)
+- Testing rápido con DB en memoria (`:memory:`)
+- Suficiente para < 100K lecturas/día
+
+La interface `Repository` desacopla la persistencia: cambiar de SQLite a TimescaleDB solo requiere crear `internal/storage/timescale.go` sin tocar lógica de negocio.
+
