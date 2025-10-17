@@ -42,5 +42,14 @@ La interface `Repository` desacopla la persistencia: cambiar de SQLite a Timesca
 - Subjects jerárquicos: `sensor.readings.<type>.<id>`, `sensor.config.<get|set>.<id>`
 - Cliente con reconnect automático y timeouts configurables
 - Handlers para configuración dinámica de sensores vía NATS
-- Testing con servidor NATS embebido.
+- Testing con servidor NATS embebido
+
+## Simuladores
+
+**Generación automática** de lecturas de sensores:
+
+- Valores realistas por tipo: temperatura (15-35°C), humedad (30-80%), presión (980-1040 hPa)
+- Simulación de errores aleatorios (5% probabilidad)
+- Ejecución periódica con goroutines (configurable por sensor)
+- Thread-safe: configuración actualizable en caliente
 
