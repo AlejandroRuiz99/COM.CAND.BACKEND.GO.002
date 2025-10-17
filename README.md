@@ -35,3 +35,12 @@ Para datos time-series de sensores IoT, lo ideal sería **TimescaleDB** (hyperta
 
 La interface `Repository` desacopla la persistencia: cambiar de SQLite a TimescaleDB solo requiere crear `internal/storage/timescale.go` sin tocar lógica de negocio.
 
+## Mensajería
+
+**NATS** para comunicación pub/sub y request/reply:
+
+- Subjects jerárquicos: `sensor.readings.<type>.<id>`, `sensor.config.<get|set>.<id>`
+- Cliente con reconnect automático y timeouts configurables
+- Handlers para configuración dinámica de sensores vía NATS
+- Testing con servidor NATS embebido.
+

@@ -5,7 +5,17 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 ## [Unreleased]
 
 ### En desarrollo
-- feat-1: Repository Pattern & SQLite persistence
+- feat-3: Simuladores de sensores
+
+## [0.3.0] - 2025-10-16
+
+### Added (feat-2: NATS Client & Messaging)
+
+- Cliente NATS con wrapper y opciones optimizadas (reconnect, timeouts)
+- Subjects helpers organizados jerárquicamente (readings, config, alerts)
+- Handlers request/reply para configuración de sensores (GET/SET)
+- Tests de integración con servidor NATS embebido
+- Mock repository para testing de handlers
 
 ## [0.2.0] - 2025-10-16
 
