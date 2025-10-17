@@ -5,7 +5,17 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 ## [Unreleased]
 
 ### En desarrollo
-- feat-3: Simuladores de sensores
+- feat-4: Servicio orquestador
+
+## [0.4.0] - 2025-10-17
+
+### Added (feat-3: Sensor Simulators)
+
+- Simulador con generación automática de lecturas periódicas
+- Valores realistas por tipo de sensor (temperatura, humedad, presión)
+- Simulación de errores de lectura (5% probabilidad)
+- Ejecución con goroutines y cancelación via context
+- Configuración dinámica thread-safe con sync.RWMutex
 
 ## [0.3.0] - 2025-10-16
 
