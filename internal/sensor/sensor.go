@@ -24,10 +24,10 @@ type Sensor struct {
 
 // SensorConfig contiene la configuración de un sensor
 type SensorConfig struct {
-	SensorID  string  `json:"sensor_id"`
-	Interval  int     `json:"interval"`  // Intervalo de muestreo en ms
-	Threshold float64 `json:"threshold"` // Umbral de alerta
-	Enabled   bool    `json:"enabled"`
+	SensorID  string  `json:"sensor_id" yaml:"sensor_id" mapstructure:"sensor_id"`
+	Interval  int     `json:"interval" yaml:"interval" mapstructure:"interval"`    // Intervalo de muestreo en ms
+	Threshold float64 `json:"threshold" yaml:"threshold" mapstructure:"threshold"` // Umbral de alerta
+	Enabled   bool    `json:"enabled" yaml:"enabled" mapstructure:"enabled"`
 }
 
 // Validate valida la configuración del sensor
@@ -76,4 +76,3 @@ func (r *SensorReading) Validate() error {
 func (r *SensorReading) IsError() bool {
 	return r.Error != nil && *r.Error != ""
 }
-

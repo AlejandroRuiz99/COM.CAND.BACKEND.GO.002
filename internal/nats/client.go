@@ -8,10 +8,20 @@ import (
 	natslib "github.com/nats-io/nats.go"
 )
 
+// Publisher es la interfaz para publicar mensajes en NATS
+type Publisher interface {
+	Publish(subject string, data []byte) error
+	IsConnected() bool
+	Close() error
+}
+
 // Client es un wrapper del cliente NATS con configuración optimizada para IoT
 type Client struct {
 	nc *natslib.Conn
 }
+
+// Asegurar que Client implementa Publisher
+var _ Publisher = (*Client)(nil)
 
 // NewClient crea un nuevo cliente NATS conectado al servidor especificado
 func NewClient(url string) (*Client, error) {

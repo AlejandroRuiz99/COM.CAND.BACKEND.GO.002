@@ -4,10 +4,20 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
-### En desarrollo
-- feat-4: Servicio orquestador
+## [0.4.0] - 2025-10-20
 
-## [0.4.0] - 2025-10-17
+### Added (feat-4: Servicio Orquestador + Configuración)
+
+- Sistema de configuración multi-entorno con Viper (YAML + variables de entorno `IOT_*`)
+- Logging estructurado con Logrus (niveles configurables, formatos JSON/text)
+- **Simulador con Worker Pool Pattern** (5 workers + task queue de 100 slots)
+- Gestión dinámica de sensores (`AddSensor`, `RemoveSensor`, `UpdateSensorConfig`)
+- Main.go completo con inicialización de componentes y graceful shutdown
+- Sistema de alertas cuando valores exceden thresholds configurables
+- Reorganización arquitectónica: `internal/simulator/`, `internal/repository/`, `internal/logger/`
+- Tests completos con cobertura del 82.6% (config 87.5%, simulator 82.6%, sensor 94.1%)
+
+## [0.3.0] - 2025-10-17
 
 ### Added (feat-3: Sensor Simulators)
 
