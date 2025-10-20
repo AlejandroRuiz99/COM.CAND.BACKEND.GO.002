@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alejandro/technical_test_uvigo/internal/repository"
 	"github.com/alejandro/technical_test_uvigo/internal/sensor"
 )
 
@@ -14,6 +15,9 @@ type MockRepository struct {
 	configs  map[string]*sensor.SensorConfig
 	readings map[string][]*sensor.SensorReading
 }
+
+// Asegurar que MockRepository implementa repository.Repository
+var _ repository.Repository = (*MockRepository)(nil)
 
 func NewMockRepository() *MockRepository {
 	return &MockRepository{

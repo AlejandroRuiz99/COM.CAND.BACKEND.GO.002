@@ -15,9 +15,9 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-// SQLiteRepository implementa sensor.Repository usando SQLite.
+// SQLiteRepository implementa repository.Repository usando SQLite.
 // Esta implementación es específica para SQLite pero respeta el contrato
-// definido en sensor.Repository, permitiendo intercambiar con otras bases
+// definido en repository.Repository, permitiendo intercambiar con otras bases
 // de datos (ej: TimescaleDB) sin modificar código de negocio.
 type SQLiteRepository struct {
 	db *sql.DB

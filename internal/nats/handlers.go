@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alejandro/technical_test_uvigo/internal/repository"
 	"github.com/alejandro/technical_test_uvigo/internal/sensor"
 	natslib "github.com/nats-io/nats.go"
 )
@@ -13,11 +14,11 @@ import (
 // Handler maneja las peticiones NATS relacionadas con sensores
 type Handler struct {
 	client *Client
-	repo   sensor.Repository
+	repo   repository.Repository
 }
 
 // NewHandler crea un nuevo handler con cliente NATS y repositorio
-func NewHandler(client *Client, repo sensor.Repository) *Handler {
+func NewHandler(client *Client, repo repository.Repository) *Handler {
 	return &Handler{
 		client: client,
 		repo:   repo,
