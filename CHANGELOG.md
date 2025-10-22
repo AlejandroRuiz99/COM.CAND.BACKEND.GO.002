@@ -4,6 +4,32 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-10-22
+
+### Added (feat-6: CLI Client)
+
+- **CLI client completo** (`iot-cli`) con Cobra framework
+  - `sensor register` - Registrar sensores dinámicamente con validación
+  - `config get/set` - Consultar/modificar configuración de sensores
+  - `readings` - Obtener lecturas históricas con estadísticas (promedio, máx, mín)
+- **Flags globales**:
+  - `--nats-url` - Especificar servidor NATS (default: localhost:4222)
+  - `--json` - Output en formato JSON para integración con scripts
+  - `--debug` - Activar logs verbosos con Logrus
+- **Tablas formateadas** con `rodaine/table` para mejor UX
+- **Arquitectura simplificada**:
+  - Main.go reducido a 28 líneas (antes: 208 líneas, -86% código)
+  - Paquete `internal/app` encapsula toda la lógica de inicialización del servidor
+  - Separación completa: CLI y Server desacoplados
+- **Logger mejorado**:
+  - CLI con Logrus (logs a stderr, output a stdout)
+  - Inicialización en dos fases: básica → configurada por Viper
+
+### Changed
+
+- Refactorizado `cmd/iot-server/main.go` para usar `internal/app/server.go`
+- CLI ahora usa Logrus en lugar de fmt para logs de debug/error
+
 ## [0.5.0] - 2025-10-21
 
 ### Added (feat-5: Handlers NATS adicionales)

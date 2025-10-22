@@ -6,20 +6,28 @@ Prueba técnica IoT - Sistema de gestión de sensores con Go y NATS
 
 ```
 .
-├── cmd/iot-server/      # Punto de entrada (main.go)
+├── cmd/
+│   ├── iot-server/      # Servidor IoT (main minimalista)
+│   └── iot-cli/         # CLI client (comandos Cobra)
 ├── internal/
+│   ├── app/             # Lógica de inicialización del servidor
 │   ├── sensor/          # Lógica de negocio (tipos, validaciones)
-│   ├── nats/            # Cliente de mensajería
-│   └── storage/         # Persistencia
-├── configs/             # Archivos de configuración
+│   ├── simulator/       # Simulador con worker pool
+│   ├── nats/            # Cliente de mensajería y handlers
+│   ├── repository/      # Interface de persistencia
+│   ├── storage/         # Implementaciones de Repository
+│   ├── config/          # Configuración con Viper
+│   └── logger/          # Logger con Logrus
+├── configs/             # Archivos de configuración YAML
 └── docs/                # Documentación
 ```
 
 **Por qué esta estructura:**
 
-- `cmd/` contiene ejecutables. Permite tener múltiples binarios si se necesitan (server, CLI, etc.)
+- `cmd/` contiene ejecutables desacoplados (server: siempre on, CLI: on-demand)
+- `internal/app/` encapsula inicialización del servidor (main.go de 28 líneas)
 - `internal/` asegura que el código no pueda ser importado desde fuera (regla del compilador Go)
-- Separación por responsabilidad: `sensor/` es dominio, `nats/` y `storage/` son infraestructura
+- Separación por responsabilidad: dominio vs infraestructura
 - Facilita testing: cada paquete se testea independientemente
 - Escalable: añadir features no requiere reestructurar
 
@@ -110,6 +118,65 @@ El sistema usa **Logrus** para logging estructurado:
 }
 ```
 
+## CLI Client
+
+El sistema incluye un **CLI client completo** (`iot-cli`) para gestionar sensores remotamente vía NATS.
+
+### Comandos disponibles
+
+**1. Registrar sensor dinámicamente**
+```bash
+./bin/iot-cli sensor register \
+  --id pressure-002 \
+  --type pressure \
+  --name "Sensor Lab" \
+  --interval 3000 \
+  --threshold 1013.25
+```
+
+**2. Consultar configuración**
+```bash
+./bin/iot-cli config get temp-001
+```
+
+**3. Actualizar configuración**
+```bash
+./bin/iot-cli config set temp-001 \
+  --interval 2000 \
+  --threshold 28.5 \
+  --enabled=false
+```
+
+**4. Obtener lecturas históricas**
+```bash
+./bin/iot-cli readings temp-001 --limit 10
+```
+
+### Flags globales
+
+- `--nats-url string` - URL del servidor NATS (default: `nats://localhost:4222`)
+- `--json` - Output en formato JSON (útil para scripts)
+- `--debug` - Activar logs verbosos con Logrus
+
+**Ejemplos:**
+```bash
+# Conectar a servidor remoto
+./bin/iot-cli --nats-url nats://prod-server:4222 config get temp-001
+
+# Output JSON para procesamiento
+./bin/iot-cli --json readings temp-001 | jq '.[] | .value'
+
+# Modo debug
+./bin/iot-cli --debug sensor register --id test-001 --type temperature
+```
+
+### Características del CLI
+
+- ✅ **Tablas formateadas** con estadísticas (promedio, máx, mín)
+- ✅ **Validación de entrada** antes de enviar a servidor
+- ✅ **Logging estructurado** con Logrus (logs a stderr, output a stdout)
+- ✅ **Desacoplado del servidor** (se comunica solo via NATS)
+
 ## Uso
 
 ### 1. Instalar dependencias
@@ -128,19 +195,34 @@ docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:2.10-alpine -js -m 8222
 **Opción B: Instalación local**
 Descarga desde [nats.io](https://nats.io/download/)
 
-### 3. Ejecutar el servidor IoT
+### 3. Compilar binarios
 
 ```bash
-go run cmd/iot-server/main.go
+# Compilar servidor y CLI
+go build -o bin/iot-server.exe ./cmd/iot-server
+go build -o bin/iot-cli.exe ./cmd/iot-cli
 ```
 
-O compilar y ejecutar:
+### 4. Ejecutar el servidor IoT
+
 ```bash
-go build -o bin/iot-server.exe cmd/iot-server/main.go
 ./bin/iot-server.exe
 ```
 
-### 4. Verificar funcionamiento
+### 5. Usar el CLI (en otra terminal)
+
+```bash
+# Ver sensores configurados
+./bin/iot-cli config get temp-001
+
+# Registrar nuevo sensor
+./bin/iot-cli sensor register --id temp-999 --type temperature
+
+# Ver lecturas
+./bin/iot-cli readings temp-001 --limit 5
+```
+
+### 6. Verificar funcionamiento
 
 El servidor mostrará logs como:
 ```
@@ -163,9 +245,9 @@ El servidor mostrará logs como:
 [Manager] ALERT: Sensor temp-001 exceeded threshold: 32.45 °C > 30.00 °C
 ```
 
-### 5. Detener el servidor
+### 7. Detener el servidor
 
-Presiona `Ctrl+C` para un shutdown limpio.
+Presiona `Ctrl+C` en la terminal del servidor para un shutdown limpio.
 
 ## Testing
 
@@ -184,35 +266,53 @@ go test ./internal/manager/... -v
 ## Arquitectura
 
 ```
-Usuario/Front
-     │
-     ↓
-[API REST]  ← feat-6 (próximamente)
-     │
-     ↓
-┌────────────────────────────────────┐
-│     IoT Server (main.go)           │
-│                                    │
-│  ┌──────────────────────────┐     │
-│  │  SimulatorManager        │     │
-│  │  - temp-001              │     │
-│  │  - hum-001               │     │
-│  │  - press-001             │     │
-│  └──────────────────────────┘     │
-│           │                        │
-│           ↓                        │
-│  ┌──────────────────────────┐     │
-│  │  Callbacks:              │     │
-│  │  1. SaveReading → DB     │     │
-│  │  2. Publish → NATS       │     │
-│  │  3. Check Alert          │     │
-│  └──────────────────────────┘     │
-└────────────────────────────────────┘
+┌─────────────┐
+│  iot-cli    │ ← Cliente remoto (Cobra + NATS)
+│  (Cobra)    │
+└──────┬──────┘
+       │ NATS Request/Reply
+       │ (config, readings, register)
+       ↓
+┌────────────────────────────────────────────┐
+│     iot-server (internal/app)              │
+│                                            │
+│  ┌──────────────────────────────────────┐ │
+│  │  NATS Handlers                       │ │
+│  │  - sensor.config.get/set.<id>        │ │
+│  │  - sensor.readings.query.<id>        │ │
+│  │  - sensor.register                   │ │
+│  └──────────────────────────────────────┘ │
+│           │                                │
+│           ↓                                │
+│  ┌──────────────────────────────────────┐ │
+│  │  Simulator (Worker Pool)             │ │
+│  │  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ │ │
+│  │  │ W1 │ │ W2 │ │ W3 │ │ W4 │ │ W5 │ │ │
+│  │  └────┘ └────┘ └────┘ └────┘ └────┘ │ │
+│  │       │ TaskQueue (100 slots) │      │ │
+│  │  temp-001 │ hum-001 │ press-001      │ │
+│  └──────────────────────────────────────┘ │
+│           │                                │
+│           ↓                                │
+│  ┌──────────────────────────────────────┐ │
+│  │  Actions:                            │ │
+│  │  1. SaveReading → Repository         │ │
+│  │  2. Publish → NATS                   │ │
+│  │  3. Check Alert                      │ │
+│  └──────────────────────────────────────┘ │
+└────────────────────────────────────────────┘
          │            │
          ↓            ↓
     [SQLite]    [NATS Server]
                      │
-                     ↓
-              [Subscribers] ← feat-7 (próximamente)
+                     ↓ Pub/Sub
+              [Subscribers] ← feat-7 (Docker)
+                [Dashboards]
 ```
+
+**Características clave:**
+- ✅ **CLI y Server desacoplados** (comunicación solo via NATS)
+- ✅ **Worker Pool** escalable (5 workers, queue de 100 tareas)
+- ✅ **Main.go minimalista** (28 líneas, lógica en `internal/app`)
+- ✅ **Registro dinámico** de sensores sin reiniciar servidor
 
