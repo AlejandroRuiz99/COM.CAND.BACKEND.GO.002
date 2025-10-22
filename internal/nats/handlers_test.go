@@ -3,9 +3,11 @@ package nats
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/alejandro/technical_test_uvigo/internal/config"
 	"github.com/alejandro/technical_test_uvigo/internal/repository"
 	"github.com/alejandro/technical_test_uvigo/internal/sensor"
 )
@@ -224,5 +226,137 @@ func TestHandler_ConfigGetNotFound(t *testing.T) {
 
 	if result["error"] == "" {
 		t.Error("expected error in response for nonexistent sensor")
+	}
+}
+
+func TestHandler_ReadingsQuery(t *testing.T) {
+	_, url := setupTestNATS(t)
+
+	client, err := NewClient(url)
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+	defer client.Close()
+
+	// Setup mock repository con lecturas de prueba
+	repo := NewMockRepository()
+	sensorID := "temp-001"
+
+	// Añadir algunas lecturas
+	for i := 0; i < 15; i++ {
+		reading := &sensor.SensorReading{
+			ID:        fmt.Sprintf("reading-%d", i),
+			SensorID:  sensorID,
+			Type:      sensor.SensorTypeTemperature,
+			Value:     float64(20 + i),
+			Unit:      "°C",
+			Timestamp: time.Now(),
+		}
+		repo.SaveReading(context.Background(), reading)
+	}
+
+	// Crear handler
+	handler := NewHandler(client, repo)
+	err = handler.HandleConfigRequests()
+	if err != nil {
+		t.Fatalf("HandleConfigRequests() failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Request de lecturas
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	subject := ReadingsQuerySubject(sensorID)
+	requestBody, _ := json.Marshal(map[string]int{"limit": 5})
+
+	response, err := client.Request(ctx, subject, requestBody)
+	if err != nil {
+		t.Fatalf("Request() failed: %v", err)
+	}
+
+	// Parsear respuesta
+	var readings []*sensor.SensorReading
+	if err := json.Unmarshal(response.Data, &readings); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	// Verificar
+	if len(readings) > 5 {
+		t.Errorf("expected at most 5 readings, got %d", len(readings))
+	}
+}
+
+func TestHandler_Register(t *testing.T) {
+	_, url := setupTestNATS(t)
+
+	client, err := NewClient(url)
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+	defer client.Close()
+
+	repo := NewMockRepository()
+	handler := NewHandler(client, repo)
+
+	// Configurar callback de registro
+	registered := false
+	handler.SetAddSensorCallback(func(sensorDef config.SensorDef) error {
+		registered = true
+		return nil
+	})
+
+	err = handler.HandleConfigRequests()
+	if err != nil {
+		t.Fatalf("HandleConfigRequests() failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Crear definición de sensor
+	newSensor := config.SensorDef{
+		ID:   "new-sensor-001",
+		Type: sensor.SensorTypeTemperature,
+		Name: "New Temperature Sensor",
+		Config: sensor.SensorConfig{
+			SensorID:  "new-sensor-001",
+			Interval:  2000,
+			Threshold: 28.0,
+			Enabled:   true,
+		},
+	}
+
+	sensorData, err := json.Marshal(newSensor)
+	if err != nil {
+		t.Fatalf("failed to marshal sensor: %v", err)
+	}
+
+	// Request para registrar sensor
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	subject := RegisterSubject()
+	response, err := client.Request(ctx, subject, sensorData)
+	if err != nil {
+		t.Fatalf("Request() failed: %v", err)
+	}
+
+	// Verificar respuesta
+	var result map[string]interface{}
+	if err := json.Unmarshal(response.Data, &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if result["status"] != "ok" {
+		t.Errorf("expected status ok, got %v", result["status"])
+	}
+
+	if result["sensor_id"] != "new-sensor-001" {
+		t.Errorf("expected sensor_id new-sensor-001, got %v", result["sensor_id"])
+	}
+
+	if !registered {
+		t.Error("sensor registration callback was not called")
 	}
 }

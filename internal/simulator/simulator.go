@@ -192,7 +192,12 @@ func (s *Simulator) worker(id int) {
 			logger.WithField("worker_id", id).Debug("[Simulator] Worker stopped")
 			return
 
-		case task := <-s.taskQueue:
+		case task, ok := <-s.taskQueue:
+			if !ok {
+				// Canal cerrado, terminar worker
+				logger.WithField("worker_id", id).Debug("[Simulator] Task queue closed, worker stopping")
+				return
+			}
 			// Procesar la lectura del sensor
 			s.processReading(task.sensorID, task.state)
 		}
@@ -424,7 +429,13 @@ func (s *Simulator) ListSensors() []string {
 func (s *Simulator) Stop() {
 	logger.Info("[Simulator] Stopping...")
 
-	// Detener todos los tickers primero
+	// 1. Cancelar context primero (detiene tickers, no enviarán más tareas)
+	s.cancel()
+
+	// 2. Dar tiempo a que los tickers terminen de enviar tareas pendientes
+	time.Sleep(50 * time.Millisecond)
+
+	// 3. Detener todos los tickers
 	s.mu.Lock()
 	for _, state := range s.sensors {
 		if state.ticker != nil {
@@ -433,13 +444,10 @@ func (s *Simulator) Stop() {
 	}
 	s.mu.Unlock()
 
-	// Cancelar context (detiene workers y tickers)
-	s.cancel()
-
-	// Cerrar el task queue (ya no se aceptan más tareas)
+	// 4. Cerrar el task queue (ya no se aceptan más tareas)
 	close(s.taskQueue)
 
-	// Esperar a que terminen todas las goroutines (workers + tickers)
+	// 5. Esperar a que terminen todas las goroutines (workers + tickers)
 	s.wg.Wait()
 
 	logger.Info("[Simulator] Stopped successfully")
