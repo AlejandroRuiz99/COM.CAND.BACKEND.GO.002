@@ -84,24 +84,29 @@ func main() {
 	defer repo.Close()
 
 	// ══════════════════════════════════════════════════════════════
-	// PASO 4: Registrar handlers NATS para configuración remota
+	// PASO 4: Inicializar simulador (antes de handlers, para callback)
+	// ══════════════════════════════════════════════════════════════
+	log.Info("[Main] Initializing simulator...")
+	sim := simulator.New(repo, natsClient)
+
+	// ══════════════════════════════════════════════════════════════
+	// PASO 5: Registrar handlers NATS para configuración remota
 	// ══════════════════════════════════════════════════════════════
 	log.Info("[Main] Registering NATS handlers...")
 	handler := natsclient.NewHandler(natsClient, repo)
+	handler.SetAddSensorCallback(sim.AddSensor) // Configurar callback para registro dinámico
 	if err := handler.HandleConfigRequests(); err != nil {
 		log.Fatalf("[Main] Failed to register NATS handlers: %v", err)
 	}
 	log.Info("[Main] ✓ NATS handlers registered")
 	log.Info("[Main]   - sensor.config.get.*")
 	log.Info("[Main]   - sensor.config.set.*")
+	log.Info("[Main]   - sensor.readings.query.*")
+	log.Info("[Main]   - sensor.register")
 
 	// ══════════════════════════════════════════════════════════════
-	// PASO 5: Inicializar simulador único y añadir sensores
+	// PASO 6: Añadir sensores desde configuración
 	// ══════════════════════════════════════════════════════════════
-	log.Info("[Main] Initializing simulator...")
-	sim := simulator.New(repo, natsClient)
-
-	// Añadir sensores desde la configuración
 	log.Info("[Main] Adding sensors to simulator...")
 	for _, sensorDef := range cfg.Sensors {
 		if err := sim.AddSensor(sensorDef); err != nil {
@@ -127,7 +132,7 @@ func main() {
 	log.Info("[Main] ✓ Workers processing sensor readings")
 
 	// ══════════════════════════════════════════════════════════════
-	// PASO 6: TODO feat-6 - Iniciar servidor HTTP API (si está habilitado)
+	// PASO 7: TODO feat-6 - Iniciar servidor HTTP API (si está habilitado)
 	// ══════════════════════════════════════════════════════════════
 	if cfg.HTTP.Enabled {
 		log.Info("[Main] HTTP API enabled but not yet implemented (coming in feat-6)")
@@ -135,7 +140,7 @@ func main() {
 	}
 
 	// ══════════════════════════════════════════════════════════════
-	// PASO 7: Sistema en marcha - Mostrar banner
+	// PASO 8: Sistema en marcha - Mostrar banner
 	// ══════════════════════════════════════════════════════════════
 	log.Info("═══════════════════════════════════════════════════════")
 	log.Info("   🚀 IoT Sensor Server is RUNNING")
@@ -151,14 +156,16 @@ func main() {
 	log.Info("   • sensor.alerts.<type>.<id>    (threshold alerts)")
 	log.Info("")
 	log.Info("🔧 NATS request/reply endpoints:")
-	log.Info("   • sensor.config.get.<id>       (get sensor config)")
-	log.Info("   • sensor.config.set.<id>       (update sensor config)")
+	log.Info("   • sensor.config.get.<id>        (get sensor config)")
+	log.Info("   • sensor.config.set.<id>        (update sensor config)")
+	log.Info("   • sensor.readings.query.<id>    (query latest readings)")
+	log.Info("   • sensor.register               (register new sensors)")
 	log.Info("")
 	log.Info("Press Ctrl+C to stop...")
 	log.Info("═══════════════════════════════════════════════════════")
 
 	// ══════════════════════════════════════════════════════════════
-	// PASO 8: Esperar señal de terminación (Graceful Shutdown)
+	// PASO 9: Esperar señal de terminación (Graceful Shutdown)
 	// ══════════════════════════════════════════════════════════════
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -172,7 +179,7 @@ func main() {
 	log.Info("═══════════════════════════════════════════════════════")
 
 	// ══════════════════════════════════════════════════════════════
-	// PASO 9: Shutdown ordenado
+	// PASO 10: Shutdown ordenado
 	// ══════════════════════════════════════════════════════════════
 
 	// 1. Detener simulador

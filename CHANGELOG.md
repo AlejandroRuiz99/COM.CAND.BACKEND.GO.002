@@ -4,6 +4,16 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-10-21
+
+### Added (feat-5: Handlers NATS adicionales)
+
+- **Nuevos handlers NATS** (completa 100% requisitos):
+  - `sensor.readings.query.<id>` - Consultar últimas N lecturas de un sensor
+  - `sensor.register` - Registrar sensores dinámicamente sin reiniciar servidor
+- Callback en handlers para integración con simulador
+- Tests de integración para nuevos handlers (coverage nats: 65.9%)
+
 ## [0.4.0] - 2025-10-20
 
 ### Added (feat-4: Servicio Orquestador + Configuración)
@@ -12,10 +22,18 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - Logging estructurado con Logrus (niveles configurables, formatos JSON/text)
 - **Simulador con Worker Pool Pattern** (5 workers + task queue de 100 slots)
 - Gestión dinámica de sensores (`AddSensor`, `RemoveSensor`, `UpdateSensorConfig`)
+- Handlers NATS básicos:
+  - `sensor.config.get.<id>` - Obtener configuración
+  - `sensor.config.set.<id>` - Actualizar configuración
 - Main.go completo con inicialización de componentes y graceful shutdown
 - Sistema de alertas cuando valores exceden thresholds configurables
 - Reorganización arquitectónica: `internal/simulator/`, `internal/repository/`, `internal/logger/`
-- Tests completos con cobertura del 82.6% (config 87.5%, simulator 82.6%, sensor 94.1%)
+- Tests completos con cobertura del 80.7% (config 87.5%, simulator 81.7%, sensor 94.1%)
+
+### Fixed
+
+- Race condition en `Stop()` del simulador (panic al cerrar workers)
+- Workers ahora manejan correctamente el cierre del task queue
 
 ## [0.3.0] - 2025-10-17
 
