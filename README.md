@@ -283,9 +283,15 @@ docker-compose logs -f iot-server
 
 ## 📚 Documentación Adicional
 
+### Guías de Uso
 - [DOCKER.md](DOCKER.md) - Guía completa de Docker Compose
 - [README_TESTS.md](README_TESTS.md) - Guía de testing detallada
 - [CHANGELOG.md](CHANGELOG.md) - Historial de cambios por feature
+
+### Documentación Técnica
+- [DECISIONES_TECNICAS.md](DECISIONES_TECNICAS.md) - 10 decisiones clave de diseño y arquitectura
+- [COBERTURA.md](COBERTURA.md) - Reporte de cobertura de tests (81.8%)
+- [MEJORAS_PRODUCTIVAS.md](MEJORAS_PRODUCTIVAS.md) - 5 mejoras para versión productiva
 
 ## 🤝 Contribuir
 

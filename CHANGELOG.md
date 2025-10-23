@@ -4,11 +4,50 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-10-23 🎉
+
+**Primera versión entregable de la prueba técnica**
+
+Sistema IoT completo con gestión de sensores, mensajería NATS, worker pool pattern, persistencia SQLite, CLI interactivo y tests end-to-end.
+
+### Added
+
+- Documentación técnica completa:
+  - `DECISIONES_TECNICAS.md` - 10 decisiones clave de diseño
+  - `COBERTURA.md` - Reporte de cobertura (81.8%)
+  - `MEJORAS_PRODUCTIVAS.md` - Roadmap para posible entorno de producción futuro
+
 ### Changed
 
 - Tests consolidados con table-driven pattern en `config_test.go`
 - README.md simplificado enfocado en Docker Compose
-- CHANGELOG.md reorganizado con features correctas
+- CHANGELOG.md reorganizado con formato consistente
+
+### Resumen de Funcionalidades
+
+✅ **Core Features:**
+- Worker Pool Pattern (5 workers, queue 100 tareas)
+- Simulación realista de sensores (temperatura, humedad, presión)
+- Sistema de alertas con thresholds configurables
+- Persistencia SQLite con Repository pattern
+- Mensajería NATS (pub/sub + request/reply)
+
+✅ **CLI Completo:**
+- Comandos: `sensor register/list`, `config get/set`, `readings`
+- Modo interactivo para uso fluido
+- Flags globales: `--nats-url`, `--json`, `--debug`
+
+✅ **DevOps:**
+- Docker Compose con NATS + IoT Server + CLI + Tests
+- Multi-stage builds (imágenes ~15MB)
+- Tests E2E con profile `test`
+- Health checks y persistencia en volúmenes
+
+✅ **Calidad:**
+- Cobertura de tests: 81.8%
+- Tests unitarios + integración
+- Zero flaky tests
+- Documentación completa
 
 ## [0.8.0] - 2025-10-23
 
