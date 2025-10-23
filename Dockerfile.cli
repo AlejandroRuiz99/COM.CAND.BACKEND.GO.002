@@ -1,0 +1,44 @@
+# Builder stage
+FROM golang:1.23-alpine AS builder
+
+# Instalar dependencias de compilación
+RUN apk add --no-cache git ca-certificates tzdata
+
+WORKDIR /app
+
+# Copiar código fuente
+COPY . .
+
+# Descargar dependencias
+RUN go mod download
+
+# Compilar el binario del CLI
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o iot-cli \
+    cmd/iot-cli/main.go
+
+# Runtime stage
+FROM alpine:3.19
+
+# Instalar certificados CA
+RUN apk --no-cache add ca-certificates
+
+# Crear usuario no-root
+RUN addgroup -S iot && adduser -S iot -G iot
+
+WORKDIR /app
+
+# Copiar binario compilado
+COPY --from=builder /app/iot-cli /usr/local/bin/iot-cli
+
+# Cambiar a usuario no-root
+USER iot
+
+# Variable de entorno para NATS URL
+ENV NATS_URL=nats://nats:4222
+
+# Comando por defecto: modo interactivo
+ENTRYPOINT ["iot-cli"]
+CMD ["interactive"]
+

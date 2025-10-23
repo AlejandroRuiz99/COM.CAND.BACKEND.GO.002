@@ -1,0 +1,78 @@
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: iot-nats
+    ports:
+      - "4222:4222"  # Cliente
+      - "8222:8222"  # Monitoring
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  iot-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iot-server
+    depends_on:
+      nats:
+        condition: service_healthy
+    environment:
+      - IOT_NATS_URL=nats://nats:4222
+      - IOT_LOG_LEVEL=info
+    volumes:
+      - iot-data:/data
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "pgrep", "iot-server"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  iot-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    container_name: iot-cli
+    profiles:
+      - tools
+    depends_on:
+      - iot-server
+    environment:
+      - NATS_URL=nats://nats:4222
+    networks:
+      - iot-network
+    stdin_open: true
+    tty: true
+
+  iot-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: iot-tests
+    profiles:
+      - test
+    depends_on:
+      iot-server:
+        condition: service_healthy
+    environment:
+      - NATS_URL=nats://nats:4222
+    networks:
+      - iot-network
+
+networks:
+  iot-network:
+    driver: bridge
+
+volumes:
+  iot-data:
+    driver: local
+

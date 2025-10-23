@@ -1,0 +1,66 @@
+# Configuración para desarrollo local
+environment: local
+
+nats:
+  url: nats://localhost:4222
+  timeout: 10s
+  max_reconnects: 10
+
+database:
+  type: sqlite
+  path: /data/sensors.db
+
+http:
+  enabled: true
+  port: 8080
+  host: 0.0.0.0
+
+sensors:
+  # Sensor de temperatura
+  - id: temp-001
+    type: temperature
+    name: "Sensor Temperatura Sala Principal"
+    location: "sala-principal"
+    config:
+      sensor_id: temp-001
+      interval: 5000      # Lectura cada 5 segundos
+      threshold: 30.0     # Alerta si T > 30°C
+      enabled: true
+
+  # Sensor de humedad
+  - id: hum-001
+    type: humidity
+    name: "Sensor Humedad Sala Principal"
+    location: "sala-principal"
+    config:
+      sensor_id: hum-001
+      interval: 3000      # Lectura cada 3 segundos
+      threshold: 80.0     # Alerta si H > 80%
+      enabled: true
+
+  # Sensor de presión
+  - id: press-001
+    type: pressure
+    name: "Sensor Presión Atmosférica"
+    location: "exterior"
+    config:
+      sensor_id: press-001
+      interval: 10000     # Lectura cada 10 segundos
+      threshold: 1040.0   # Alerta si P > 1040 hPa
+      enabled: true
+
+  # Sensor de temperatura adicional (para probar múltiples del mismo tipo)
+  - id: temp-002
+    type: temperature
+    name: "Sensor Temperatura Almacén"
+    location: "almacen"
+    config:
+      sensor_id: temp-002
+      interval: 8000      # Lectura cada 8 segundos
+      threshold: 25.0     # Alerta si T > 25°C
+      enabled: true
+
+logging:
+  level: debug
+  format: text
+
