@@ -112,6 +112,8 @@ func (s *Server) registerNATSHandlers() error {
 
 	handler := natsclient.NewHandler(s.natsClient, s.repo)
 	handler.SetAddSensorCallback(s.simulator.AddSensor)
+	handler.SetListSensorsCallback(s.simulator.GetAllSensors)
+	handler.SetUpdateConfigCallback(s.simulator.UpdateConfig)
 
 	if err := handler.HandleConfigRequests(); err != nil {
 		return err
@@ -122,6 +124,7 @@ func (s *Server) registerNATSHandlers() error {
 	s.log.Info("  - sensor.config.set.*")
 	s.log.Info("  - sensor.readings.query.*")
 	s.log.Info("  - sensor.register")
+	s.log.Info("  - sensor.list")
 
 	return nil
 }
@@ -169,6 +172,7 @@ func (s *Server) printBanner() {
 	s.log.Info("   • sensor.config.set.<id>        (update sensor config)")
 	s.log.Info("   • sensor.readings.query.<id>    (query latest readings)")
 	s.log.Info("   • sensor.register               (register new sensors)")
+	s.log.Info("   • sensor.list                   (list all sensors)")
 	s.log.Info("")
 	s.log.Info("Press Ctrl+C to stop...")
 	s.log.Info("═══════════════════════════════════════════════════════")

@@ -1,0 +1,54 @@
+# Binarios
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Datos
+data/
+*.db
+*.sqlite
+
+# Test files (comentado para permitir tests de integración)
+# *_test.go
+# test/
+coverage.txt
+coverage.out
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+Jenkinsfile
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/

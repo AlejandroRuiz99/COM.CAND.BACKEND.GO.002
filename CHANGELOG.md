@@ -4,31 +4,55 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
+### Changed
+
+- Tests consolidados con table-driven pattern en `config_test.go`
+- README.md simplificado enfocado en Docker Compose
+- CHANGELOG.md reorganizado con features correctas
+
+## [0.8.0] - 2025-10-23
+
+### Added (feat-8: Tests de Integración End-to-End)
+
+- Tests de integración end-to-end con 8 subtests (registro, configuración, lecturas, alertas)
+- Dockerfile.test e integración con docker-compose usando profile `test`
+- IDs únicos por ejecución usando timestamps para evitar conflictos
+- Debug logging y validación exhaustiva de persistencia SQLite
+
+### Fixed
+
+- Handler `sensor.register` guarda configuración en repositorio antes de añadir al simulador
+- Tests usan estructura JSON correcta con campo `Config` anidado
+- Variable de entorno `NATS_URL` configurada correctamente para tests en Docker
+
+## [0.7.0] - 2025-10-22
+
+### Added (feat-7: Docker Compose Setup)
+
+- Docker multi-stage builds para servidor (~15MB), CLI (~12MB) y tests
+- docker-compose.yml con NATS, iot-server, profiles para CLI y tests
+- Networking automático (`iot-network`), healthchecks y persistencia en volumen `iot-data`
+- Documentación completa (README.md, DOCKER.md, README_TESTS.md)
+
+### Changed
+
+- Configuración SQLite usa path absoluto `/data/sensors.db` para Docker
+- README reorganizado con Docker Compose como opción principal
+
 ## [0.6.0] - 2025-10-22
 
 ### Added (feat-6: CLI Client)
 
-- **CLI client completo** (`iot-cli`) con Cobra framework
-  - `sensor register` - Registrar sensores dinámicamente con validación
-  - `config get/set` - Consultar/modificar configuración de sensores
-  - `readings` - Obtener lecturas históricas con estadísticas (promedio, máx, mín)
-- **Flags globales**:
-  - `--nats-url` - Especificar servidor NATS (default: localhost:4222)
-  - `--json` - Output en formato JSON para integración con scripts
-  - `--debug` - Activar logs verbosos con Logrus
-- **Tablas formateadas** con `rodaine/table` para mejor UX
-- **Arquitectura simplificada**:
-  - Main.go reducido a 28 líneas (antes: 208 líneas, -86% código)
-  - Paquete `internal/app` encapsula toda la lógica de inicialización del servidor
-  - Separación completa: CLI y Server desacoplados
-- **Logger mejorado**:
-  - CLI con Logrus (logs a stderr, output a stdout)
-  - Inicialización en dos fases: básica → configurada por Viper
+- CLI completo con Cobra: `sensor register`, `config get/set`, `readings`
+- Flags globales: `--nats-url`, `--json`, `--debug` con logging Logrus
+- Tablas formateadas con estadísticas (promedio, máx, mín)
+- Modo interactivo para uso fluido sin repetir `iot-cli`
 
 ### Changed
 
-- Refactorizado `cmd/iot-server/main.go` para usar `internal/app/server.go`
-- CLI ahora usa Logrus en lugar de fmt para logs de debug/error
+- Main.go del servidor reducido a 28 líneas (-86% código)
+- Lógica de inicialización movida a `internal/app/server.go`
+- CLI y Server completamente desacoplados (comunicación solo vía NATS)
 
 ## [0.5.0] - 2025-10-21
 
@@ -44,22 +68,14 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ### Added (feat-4: Servicio Orquestador + Configuración)
 
-- Sistema de configuración multi-entorno con Viper (YAML + variables de entorno `IOT_*`)
-- Logging estructurado con Logrus (niveles configurables, formatos JSON/text)
-- **Simulador con Worker Pool Pattern** (5 workers + task queue de 100 slots)
-- Gestión dinámica de sensores (`AddSensor`, `RemoveSensor`, `UpdateSensorConfig`)
-- Handlers NATS básicos:
-  - `sensor.config.get.<id>` - Obtener configuración
-  - `sensor.config.set.<id>` - Actualizar configuración
-- Main.go completo con inicialización de componentes y graceful shutdown
-- Sistema de alertas cuando valores exceden thresholds configurables
-- Reorganización arquitectónica: `internal/simulator/`, `internal/repository/`, `internal/logger/`
-- Tests completos con cobertura del 80.7% (config 87.5%, simulator 81.7%, sensor 94.1%)
+- Simulador con Worker Pool Pattern (5 workers + task queue de 100 slots)
+- Configuración multi-entorno con Viper (YAML + variables `IOT_*`)
+- Handlers NATS básicos: `sensor.config.get/set.<id>`
+- Sistema de alertas con thresholds configurables y logging Logrus
 
 ### Fixed
 
-- Race condition en `Stop()` del simulador (panic al cerrar workers)
-- Workers ahora manejan correctamente el cierre del task queue
+- Race condition en `Stop()` del simulador al cerrar workers
 
 ## [0.3.0] - 2025-10-17
 

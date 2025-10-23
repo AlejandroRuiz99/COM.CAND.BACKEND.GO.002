@@ -8,7 +8,7 @@ nats:
 
 database:
   type: sqlite
-  path: ./data/sensors.db
+  path: /data/sensors.db
 
 http:
   enabled: true

@@ -9,6 +9,7 @@ import (
 	"github.com/alejandro/technical_test_uvigo/internal/config"
 	natsclient "github.com/alejandro/technical_test_uvigo/internal/nats"
 	"github.com/alejandro/technical_test_uvigo/internal/sensor"
+	"github.com/rodaine/table"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -149,12 +150,72 @@ func registerSensor(cmd *cobra.Command, args []string) error {
 }
 
 func listSensors(cmd *cobra.Command, args []string) error {
-	// TODO: Implementar endpoint para listar sensores
-	// Por ahora solo mostramos un mensaje
-	fmt.Println("⚠️  Lista de sensores no disponible")
-	fmt.Println("💡 Este comando estará disponible cuando se implemente el endpoint HTTP API en feat-7")
-	fmt.Println()
-	fmt.Println("Alternativamente, puedes consultar sensores individuales con:")
-	fmt.Println("  iot-cli config get <sensor-id>")
+	log.Debug("Listando sensores")
+
+	// Conectar a NATS
+	log.Debugf("Conectando a NATS: %s", natsURL)
+	client, err := natsclient.NewClient(natsURL)
+	if err != nil {
+		log.Errorf("Error conectando a NATS: %v", err)
+		return fmt.Errorf("error conectando a NATS: %w", err)
+	}
+	defer client.Close()
+	log.Debug("Conexión a NATS establecida")
+
+	// Request a NATS para listar sensores
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	subject := natsclient.ListSubject()
+	log.Debugf("Enviando request a %s", subject)
+
+	response, err := client.Request(ctx, subject, []byte{})
+	if err != nil {
+		log.Errorf("Error al listar sensores: %v", err)
+		return fmt.Errorf("error al listar sensores: %w", err)
+	}
+
+	// Parsear respuesta
+	var sensors []config.SensorDef
+	if err := json.Unmarshal(response.Data, &sensors); err != nil {
+		log.Errorf("Error parseando respuesta: %v", err)
+		return fmt.Errorf("error parseando respuesta: %w", err)
+	}
+
+	if len(sensors) == 0 {
+		fmt.Println("⚠️  No hay sensores registrados en el sistema")
+		return nil
+	}
+
+	// Output según formato
+	if outputJSON {
+		jsonOutput, _ := json.MarshalIndent(sensors, "", "  ")
+		fmt.Println(string(jsonOutput))
+	} else {
+		fmt.Printf("\n📊 Sensores registrados (%d):\n\n", len(sensors))
+
+		tbl := table.New("ID", "Tipo", "Nombre", "Intervalo", "Threshold", "Estado")
+		for _, s := range sensors {
+			estado := "❌ Deshabilitado"
+			if s.Config.Enabled {
+				estado = "✅ Habilitado"
+			}
+			name := s.Name
+			if name == "" {
+				name = "-"
+			}
+			tbl.AddRow(
+				s.ID,
+				string(s.Type),
+				name,
+				fmt.Sprintf("%dms", s.Config.Interval),
+				fmt.Sprintf("%.2f", s.Config.Threshold),
+				estado,
+			)
+		}
+		tbl.Print()
+		fmt.Println()
+	}
+
 	return nil
 }

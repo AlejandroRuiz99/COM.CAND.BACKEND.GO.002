@@ -9,6 +9,7 @@ const (
 	SubjectConfig        = "sensor.config"         // sensor.config.<get|set>.<id>
 	SubjectAlerts        = "sensor.alerts"         // sensor.alerts.<type>.<id>
 	SubjectRegister      = "sensor.register"       // sensor.register
+	SubjectList          = "sensor.list"           // sensor.list
 )
 
 // ReadingSubject construye el subject para publicar una lectura
@@ -44,4 +45,9 @@ func ReadingsQuerySubject(sensorID string) string {
 // RegisterSubject retorna el subject para registrar nuevos sensores
 func RegisterSubject() string {
 	return SubjectRegister
+}
+
+// ListSubject retorna el subject para listar todos los sensores
+func ListSubject() string {
+	return SubjectList
 }
