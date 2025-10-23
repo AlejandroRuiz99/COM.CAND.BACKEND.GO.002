@@ -425,6 +425,58 @@ func (s *Simulator) ListSensors() []string {
 	return sensors
 }
 
+// GetAllSensors devuelve todos los sensores con su definición completa
+func (s *Simulator) GetAllSensors() []config.SensorDef {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sensors := make([]config.SensorDef, 0, len(s.sensors))
+	for _, state := range s.sensors {
+		sensors = append(sensors, state.def)
+	}
+	return sensors
+}
+
+// UpdateConfig actualiza la configuración de un sensor en tiempo real
+func (s *Simulator) UpdateConfig(sensorID string, newConfig sensor.SensorConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, exists := s.sensors[sensorID]
+	if !exists {
+		return fmt.Errorf("sensor %s not found", sensorID)
+	}
+
+	// Validar nueva configuración
+	if err := newConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+
+	// Guardar intervalo antiguo antes de actualizar
+	oldInterval := time.Duration(state.def.Config.Interval) * time.Millisecond
+	newInterval := time.Duration(newConfig.Interval) * time.Millisecond
+
+	// Actualizar la definición en el estado
+	state.def.Config = newConfig
+
+	// Si cambió el intervalo, recrear el ticker
+	if oldInterval != newInterval && state.ticker != nil {
+		// Detener el ticker anterior
+		state.ticker.Stop()
+
+		// Crear nuevo ticker con el intervalo actualizado
+		state.ticker = time.NewTicker(newInterval)
+
+		logger.Infof("[Simulator] Updated ticker for sensor %s: %dms -> %dms",
+			sensorID, oldInterval.Milliseconds(), newInterval.Milliseconds())
+	}
+
+	logger.Infof("[Simulator] Config updated for sensor %s (interval=%dms, threshold=%.2f, enabled=%v)",
+		sensorID, newConfig.Interval, newConfig.Threshold, newConfig.Enabled)
+
+	return nil
+}
+
 // Stop detiene el simulador, workers y espera a que todas las goroutines terminen
 func (s *Simulator) Stop() {
 	logger.Info("[Simulator] Stopping...")

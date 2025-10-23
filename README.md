@@ -1,318 +1,299 @@
-# technical_test_uvigo
+# Sistema IoT - Gestión de Sensores con Go y NATS
 
-Prueba técnica IoT - Sistema de gestión de sensores con Go y NATS
+Prueba técnica: Sistema de gestión de sensores IoT con mensajería NATS, worker pool pattern y persistencia SQLite.
 
-## Estructura del Proyecto
+## 🚀 Quick Start
 
-```
-.
-├── cmd/
-│   ├── iot-server/      # Servidor IoT (main minimalista)
-│   └── iot-cli/         # CLI client (comandos Cobra)
-├── internal/
-│   ├── app/             # Lógica de inicialización del servidor
-│   ├── sensor/          # Lógica de negocio (tipos, validaciones)
-│   ├── simulator/       # Simulador con worker pool
-│   ├── nats/            # Cliente de mensajería y handlers
-│   ├── repository/      # Interface de persistencia
-│   ├── storage/         # Implementaciones de Repository
-│   ├── config/          # Configuración con Viper
-│   └── logger/          # Logger con Logrus
-├── configs/             # Archivos de configuración YAML
-└── docs/                # Documentación
-```
-
-**Por qué esta estructura:**
-
-- `cmd/` contiene ejecutables desacoplados (server: siempre on, CLI: on-demand)
-- `internal/app/` encapsula inicialización del servidor (main.go de 28 líneas)
-- `internal/` asegura que el código no pueda ser importado desde fuera (regla del compilador Go)
-- Separación por responsabilidad: dominio vs infraestructura
-- Facilita testing: cada paquete se testea independientemente
-- Escalable: añadir features no requiere reestructurar
-
-Basado en el [Standard Go Project Layout](https://github.com/golang-standards/project-layout).
-
-## Persistencia
-
-Para datos time-series de sensores IoT, lo ideal sería **TimescaleDB** (hypertables, agregaciones automáticas, retención). Sin embargo, usamos **SQLite** para esta prueba técnica por pragmatismo:
-
-- Sin dependencias externas (driver puro Go sin CGO)
-- Testing rápido con DB en memoria (`:memory:`)
-- Suficiente para < 100K lecturas/día
-
-La interface `Repository` desacopla la persistencia: cambiar de SQLite a TimescaleDB solo requiere crear `internal/storage/timescale.go` sin tocar lógica de negocio.
-
-## Mensajería
-
-**NATS** para comunicación pub/sub y request/reply:
-
-- Subjects jerárquicos: `sensor.readings.<type>.<id>`, `sensor.config.<get|set>.<id>`
-- Cliente con reconnect automático y timeouts configurables
-- Handlers para configuración dinámica de sensores vía NATS
-- Testing con servidor NATS embebido
-
-## Simuladores
-
-**Generación automática** de lecturas de sensores con **Worker Pool Pattern**:
-
-- **Arquitectura escalable**: 5 workers fijos procesan todos los sensores
-- **Task Queue**: Buffer de 100 tareas con backpressure automático
-- Valores realistas por tipo: temperatura (15-35°C), humedad (30-80%), presión (980-1040 hPa)
-- Simulación de errores aleatorios (5% probabilidad)
-- Thread-safe: configuración actualizable en caliente
-
-**¿Por qué Worker Pool y no 1 goroutine/sensor?**
-- ✅ Memoria constante independiente del número de sensores
-- ✅ Menos context switches del scheduler de Go
-- ✅ Patrón usado en sistemas IoT reales (EdgeX Foundry, Mainflux)
-- ✅ Escalable a 1000+ sensores sin degradación
-
-## Configuración
-
-El sistema usa **Viper** para cargar configuración desde archivos YAML + variables de entorno.
-
-### Archivos de configuración
-
-- `configs/values_local.yaml` - Desarrollo local (incluido en repo)
-- Otras configuraciones (INT, QA, PROD) deben estar en un **repositorio externo** de configuraciones
-
-### Variables de entorno
-
-**Cargar archivo específico:**
 ```bash
-export CONFIG_FILE=/path/to/values_qa.yaml
+# 1. Levantar el sistema
+docker-compose up -d
+
+# 2. Ejecutar tests de integración
+docker-compose --profile test run --rm iot-tests
+
+# 3. Usar el CLI
+docker-compose run --rm iot-cli sensor list
 ```
 
-**Override de valores individuales** (prefijo `IOT_`):
+## 📋 Tabla de Contenidos
+
+- [Características](#características)
+- [Arquitectura](#arquitectura)
+- [Uso](#uso)
+- [Tests](#tests)
+- [Estructura del Proyecto](#estructura-del-proyecto)
+- [Decisiones Técnicas](#decisiones-técnicas)
+
+## ✨ Características
+
+- ✅ **Worker Pool Pattern** - Procesamiento escalable de sensores (5 workers, queue de 100 tareas)
+- ✅ **NATS Messaging** - Comunicación pub/sub y request/reply
+- ✅ **CLI Completo** - Gestión remota de sensores con Cobra
+- ✅ **Persistencia SQLite** - Repository pattern para fácil migración
+- ✅ **Logging Estructurado** - Logrus con niveles y formatos configurables
+- ✅ **Hot Configuration** - Actualización de sensores sin reiniciar
+- ✅ **Docker Ready** - Docker Compose con health checks
+- ✅ **Tests Completos** - Unitarios + Integración end-to-end
+
+## 🏗️ Arquitectura
+
+```
+┌─────────────┐
+│  iot-cli    │ ← Cliente CLI (Cobra + NATS)
+└──────┬──────┘
+       │ NATS Request/Reply
+       ↓
+┌────────────────────────────────────────┐
+│     iot-server                         │
+│  ┌──────────────────────────────────┐  │
+│  │  NATS Handlers                   │  │
+│  │  - sensor.config.get/set.<id>    │  │
+│  │  - sensor.readings.query.<id>    │  │
+│  │  - sensor.register               │  │
+│  │  - sensor.list                   │  │
+│  └──────────────────────────────────┘  │
+│           │                             │
+│  ┌──────────────────────────────────┐  │
+│  │  Simulator (Worker Pool)         │  │
+│  │  ┌────┐ ┌────┐ ┌────┐ ┌────┐    │  │
+│  │  │ W1 │ │ W2 │ │ W3 │ │ W4 │    │  │
+│  │  └────┘ └────┘ └────┘ └────┘    │  │
+│  │       TaskQueue (100 slots)      │  │
+│  └──────────────────────────────────┘  │
+│           │                             │
+│  ┌──────────────────────────────────┐  │
+│  │  Actions:                        │  │
+│  │  1. SaveReading → Repository     │  │
+│  │  2. Publish → NATS               │  │
+│  │  3. Check Alert                  │  │
+│  └──────────────────────────────────┘  │
+└────────────────────────────────────────┘
+         │            │
+         ↓            ↓
+    [SQLite]    [NATS Server]
+```
+
+## 🐳 Uso
+
+### Comandos Docker Compose
+
 ```bash
-export IOT_NATS_URL=nats://production:4222
-export IOT_DATABASE_TYPE=influxdb
-export IOT_DATABASE_PATH=/data/sensors.db
-export IOT_LOGGING_LEVEL=warn
+# Levantar el sistema (NATS + IoT Server)
+docker-compose up -d
+
+# Ver logs
+docker-compose logs -f iot-server
+
+# Ver estado
+docker-compose ps
+
+# Detener el sistema
+docker-compose down
+
+# Detener y eliminar volúmenes
+docker-compose down -v
 ```
 
-Si no se especifica `CONFIG_FILE`, usa `values_local.yaml` por defecto.
+### CLI - Gestión de Sensores
 
-## Logging
-
-El sistema usa **Logrus** para logging estructurado:
-
-- **Niveles**: debug, info, warn, error
-- **Formatos**: text (desarrollo), json (producción)
-- **Configuración** en YAML:
-  ```yaml
-  logging:
-    level: info
-    format: json
-  ```
-
-**Logs con campos estructurados:**
-```json
-{
-  "level": "info",
-  "msg": "[Manager] Started simulator",
-  "sensor_id": "temp-001",
-  "type": "temperature",
-  "time": "2025-10-20T15:04:05Z"
-}
-```
-
-## CLI Client
-
-El sistema incluye un **CLI client completo** (`iot-cli`) para gestionar sensores remotamente vía NATS.
-
-### Comandos disponibles
-
-**1. Registrar sensor dinámicamente**
+**Listar sensores:**
 ```bash
-./bin/iot-cli sensor register \
+docker-compose run --rm iot-cli sensor list
+```
+
+**Registrar nuevo sensor:**
+```bash
+docker-compose run --rm iot-cli sensor register \
   --id pressure-002 \
   --type pressure \
-  --name "Sensor Lab" \
   --interval 3000 \
   --threshold 1013.25
 ```
 
-**2. Consultar configuración**
+**Actualizar configuración:**
 ```bash
-./bin/iot-cli config get temp-001
-```
-
-**3. Actualizar configuración**
-```bash
-./bin/iot-cli config set temp-001 \
+docker-compose run --rm iot-cli config set temp-001 \
   --interval 2000 \
-  --threshold 28.5 \
-  --enabled=false
+  --threshold 28.5
 ```
 
-**4. Obtener lecturas históricas**
+**Consultar lecturas:**
 ```bash
-./bin/iot-cli readings temp-001 --limit 10
+docker-compose run --rm iot-cli readings temp-001
 ```
 
-### Flags globales
-
-- `--nats-url string` - URL del servidor NATS (default: `nats://localhost:4222`)
-- `--json` - Output en formato JSON (útil para scripts)
-- `--debug` - Activar logs verbosos con Logrus
-
-**Ejemplos:**
+**Modo interactivo:**
 ```bash
-# Conectar a servidor remoto
-./bin/iot-cli --nats-url nats://prod-server:4222 config get temp-001
-
-# Output JSON para procesamiento
-./bin/iot-cli --json readings temp-001 | jq '.[] | .value'
-
-# Modo debug
-./bin/iot-cli --debug sensor register --id test-001 --type temperature
+docker-compose run --rm iot-cli interactive
 ```
 
-### Características del CLI
+### CLI Local (Desarrollo)
 
-- ✅ **Tablas formateadas** con estadísticas (promedio, máx, mín)
-- ✅ **Validación de entrada** antes de enviar a servidor
-- ✅ **Logging estructurado** con Logrus (logs a stderr, output a stdout)
-- ✅ **Desacoplado del servidor** (se comunica solo via NATS)
-
-## Uso
-
-### 1. Instalar dependencias
+Si tienes Go instalado y prefieres desarrollo local:
 
 ```bash
-go mod download
-```
+# 1. Levantar solo NATS
+docker run -d --name nats -p 4222:4222 nats:2.10-alpine
 
-### 2. Levantar NATS Server
+# 2. Compilar binarios
+go build -o bin/iot-server ./cmd/iot-server
+go build -o bin/iot-cli ./cmd/iot-cli
 
-**Opción A: Con Docker**
-```bash
-docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:2.10-alpine -js -m 8222
-```
+# 3. Ejecutar servidor
+./bin/iot-server
 
-**Opción B: Instalación local**
-Descarga desde [nats.io](https://nats.io/download/)
-
-### 3. Compilar binarios
-
-```bash
-# Compilar servidor y CLI
-go build -o bin/iot-server.exe ./cmd/iot-server
-go build -o bin/iot-cli.exe ./cmd/iot-cli
-```
-
-### 4. Ejecutar el servidor IoT
-
-```bash
-./bin/iot-server.exe
-```
-
-### 5. Usar el CLI (en otra terminal)
-
-```bash
-# Ver sensores configurados
+# 4. Usar CLI (en otra terminal)
+./bin/iot-cli sensor list
 ./bin/iot-cli config get temp-001
-
-# Registrar nuevo sensor
-./bin/iot-cli sensor register --id temp-999 --type temperature
-
-# Ver lecturas
-./bin/iot-cli readings temp-001 --limit 5
 ```
 
-### 6. Verificar funcionamiento
+## 🧪 Tests
 
-El servidor mostrará logs como:
-```
-═══════════════════════════════════════════════════════
-   🚀 IoT Sensor Server is RUNNING
-═══════════════════════════════════════════════════════
-
-📊 System Status:
-   • NATS:      nats://localhost:4222 ✓
-   • Database:  sqlite ✓
-   • Simulators: 4 active
-
-📡 Publishing to NATS subjects:
-   • sensor.readings.<type>.<id>  (sensor readings)
-   • sensor.alerts.<type>.<id>    (threshold alerts)
-```
-
-**Logs de lecturas:**
-```
-[Manager] ALERT: Sensor temp-001 exceeded threshold: 32.45 °C > 30.00 °C
-```
-
-### 7. Detener el servidor
-
-Presiona `Ctrl+C` en la terminal del servidor para un shutdown limpio.
-
-## Testing
+### Tests de Integración
 
 ```bash
-# Ejecutar todos los tests
-go test ./...
+# Ejecutar tests end-to-end
+docker-compose --profile test run --rm iot-tests
+```
+
+**Los tests verifican:**
+- ✅ Listado de sensores iniciales
+- ✅ Registro dinámico de sensores
+- ✅ Actualización de configuración
+- ✅ Consulta de lecturas
+- ✅ Sistema de alertas
+- ✅ Persistencia en SQLite
+- ✅ Reflejo de cambios en tiempo real
+
+### Tests Unitarios
+
+```bash
+# Ejecutar tests localmente
+go test ./... -v
 
 # Con cobertura
 go test ./... -cover
 
 # Tests específicos
-go test ./internal/config/... -v
-go test ./internal/manager/... -v
+go test ./internal/simulator/... -v
+go test ./internal/nats/... -v
 ```
 
-## Arquitectura
+Ver [README_TESTS.md](README_TESTS.md) para más detalles.
+
+## 📁 Estructura del Proyecto
 
 ```
-┌─────────────┐
-│  iot-cli    │ ← Cliente remoto (Cobra + NATS)
-│  (Cobra)    │
-└──────┬──────┘
-       │ NATS Request/Reply
-       │ (config, readings, register)
-       ↓
-┌────────────────────────────────────────────┐
-│     iot-server (internal/app)              │
-│                                            │
-│  ┌──────────────────────────────────────┐ │
-│  │  NATS Handlers                       │ │
-│  │  - sensor.config.get/set.<id>        │ │
-│  │  - sensor.readings.query.<id>        │ │
-│  │  - sensor.register                   │ │
-│  └──────────────────────────────────────┘ │
-│           │                                │
-│           ↓                                │
-│  ┌──────────────────────────────────────┐ │
-│  │  Simulator (Worker Pool)             │ │
-│  │  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ │ │
-│  │  │ W1 │ │ W2 │ │ W3 │ │ W4 │ │ W5 │ │ │
-│  │  └────┘ └────┘ └────┘ └────┘ └────┘ │ │
-│  │       │ TaskQueue (100 slots) │      │ │
-│  │  temp-001 │ hum-001 │ press-001      │ │
-│  └──────────────────────────────────────┘ │
-│           │                                │
-│           ↓                                │
-│  ┌──────────────────────────────────────┐ │
-│  │  Actions:                            │ │
-│  │  1. SaveReading → Repository         │ │
-│  │  2. Publish → NATS                   │ │
-│  │  3. Check Alert                      │ │
-│  └──────────────────────────────────────┘ │
-└────────────────────────────────────────────┘
-         │            │
-         ↓            ↓
-    [SQLite]    [NATS Server]
-                     │
-                     ↓ Pub/Sub
-              [Subscribers] ← feat-7 (Docker)
-                [Dashboards]
+.
+├── cmd/
+│   ├── iot-server/        # Servidor IoT (main minimalista)
+│   └── iot-cli/           # CLI client (Cobra)
+├── internal/
+│   ├── app/               # Inicialización del servidor
+│   ├── sensor/            # Lógica de negocio
+│   ├── simulator/         # Worker pool pattern
+│   ├── nats/              # Mensajería y handlers
+│   ├── repository/        # Interface de persistencia
+│   ├── storage/           # Implementación SQLite
+│   ├── config/            # Configuración (Viper)
+│   └── logger/            # Logging (Logrus)
+├── configs/               # YAML de configuración
+├── test/integration/      # Tests end-to-end
+├── docker-compose.yml     # Orquestación
+├── Dockerfile             # Imagen del servidor
+├── Dockerfile.cli         # Imagen del CLI
+└── Dockerfile.test        # Imagen de tests
 ```
 
-**Características clave:**
-- ✅ **CLI y Server desacoplados** (comunicación solo via NATS)
-- ✅ **Worker Pool** escalable (5 workers, queue de 100 tareas)
-- ✅ **Main.go minimalista** (28 líneas, lógica en `internal/app`)
-- ✅ **Registro dinámico** de sensores sin reiniciar servidor
+**¿Por qué esta estructura?**
 
+- `cmd/` → Ejecutables desacoplados (server vs CLI)
+- `internal/app/` → Encapsula inicialización (main.go de 28 líneas)
+- `internal/` → Código no importable desde fuera (regla del compilador Go)
+- Separación por responsabilidad: dominio vs infraestructura
+- Facilita testing independiente por paquete
+- Escalable sin reestructurar
+
+Basado en el [Standard Go Project Layout](https://github.com/golang-standards/project-layout).
+
+## 🎯 Decisiones Técnicas
+
+### ¿Por qué Worker Pool en vez de 1 goroutine/sensor?
+
+- ✅ Memoria constante independiente del número de sensores
+- ✅ Menos context switches del scheduler de Go
+- ✅ Patrón usado en sistemas IoT reales (EdgeX Foundry, Mainflux)
+- ✅ Escalable a 1000+ sensores sin degradación
+
+### ¿Por qué SQLite en vez de TimescaleDB?
+
+Para datos time-series de sensores IoT, **TimescaleDB** sería ideal (hypertables, agregaciones automáticas, retención). Sin embargo, usamos **SQLite** por pragmatismo:
+
+- Sin dependencias externas (driver puro Go sin CGO)
+- Testing rápido con DB en memoria (`:memory:`)
+- Suficiente para < 100K lecturas/día
+
+La interface `Repository` permite cambiar a TimescaleDB creando `internal/storage/timescale.go` sin tocar lógica de negocio.
+
+### ¿Por qué NATS?
+
+- Subjects jerárquicos: `sensor.readings.<type>.<id>`
+- Cliente con reconnect automático
+- Request/Reply para configuración dinámica
+- Testing con servidor NATS embebido
+
+### Configuración
+
+El sistema usa **Viper** para cargar configuración desde YAML + variables de entorno.
+
+**Archivo:** `configs/values_local.yaml`
+
+**Variables de entorno** (prefijo `IOT_`):
+```bash
+export IOT_NATS_URL=nats://production:4222
+export IOT_DATABASE_PATH=/data/sensors.db
+export IOT_LOG_LEVEL=warn
+```
+
+### Logging
+
+**Logrus** con logging estructurado:
+
+```json
+{
+  "level": "info",
+  "msg": "[Simulator] Sensor added",
+  "sensor_id": "temp-001",
+  "type": "temperature",
+  "interval": 5000,
+  "time": "2025-10-23T15:04:05Z"
+}
+```
+
+## 🔍 Monitoreo
+
+**NATS Monitoring:**
+- URL: http://localhost:8222
+- Proporciona métricas de conexiones, mensajes, subscripciones
+
+**Logs del servidor:**
+```bash
+docker-compose logs -f iot-server
+```
+
+## 📚 Documentación Adicional
+
+- [DOCKER.md](DOCKER.md) - Guía completa de Docker Compose
+- [README_TESTS.md](README_TESTS.md) - Guía de testing detallada
+- [CHANGELOG.md](CHANGELOG.md) - Historial de cambios por feature
+
+## 🤝 Contribuir
+
+1. Los cambios deben incluir tests
+2. Ejecutar `go fmt` antes de commit
+3. Ejecutar tests: `docker-compose --profile test run --rm iot-tests`
+4. Documentar decisiones de diseño en commits
+
+## 📝 Licencia
+
+Este proyecto es una prueba técnica para demostración de habilidades.

@@ -128,117 +128,111 @@ nats:
 	}
 }
 
-func TestValidate_MissingEnvironment(t *testing.T) {
-	cfg := &Config{
-		NATS: NATSConfig{
-			URL:     "nats://localhost:4222",
-			Timeout: 10 * time.Second,
+func TestConfig_Validate(t *testing.T) {
+	validSensor := SensorDef{
+		ID:   "temp-001",
+		Type: sensor.SensorTypeTemperature,
+		Name: "Test",
+		Config: sensor.SensorConfig{
+			SensorID:  "temp-001",
+			Interval:  5000,
+			Threshold: 30.0,
+			Enabled:   true,
 		},
-		Database: DatabaseConfig{
-			Type: "sqlite",
-			Path: "./test.db",
-		},
-		Sensors: []SensorDef{
-			{
-				ID:   "temp-001",
-				Type: sensor.SensorTypeTemperature,
-				Name: "Test",
-				Config: sensor.SensorConfig{
-					SensorID:  "temp-001",
-					Interval:  5000,
-					Threshold: 30.0,
-					Enabled:   true,
+	}
+
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+	}{
+		{
+			name: "valid config",
+			config: &Config{
+				Environment: "test",
+				NATS: NATSConfig{
+					URL:     "nats://localhost:4222",
+					Timeout: 10 * time.Second,
 				},
-			},
-		},
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Expected error for missing environment, got nil")
-	}
-}
-
-func TestValidate_MissingNATSURL(t *testing.T) {
-	cfg := &Config{
-		Environment: "test",
-		NATS: NATSConfig{
-			Timeout: 10 * time.Second,
-		},
-		Database: DatabaseConfig{
-			Type: "sqlite",
-			Path: "./test.db",
-		},
-		Sensors: []SensorDef{
-			{
-				ID:   "temp-001",
-				Type: sensor.SensorTypeTemperature,
-				Name: "Test",
-				Config: sensor.SensorConfig{
-					SensorID:  "temp-001",
-					Interval:  5000,
-					Threshold: 30.0,
-					Enabled:   true,
+				Database: DatabaseConfig{
+					Type: "sqlite",
+					Path: "./test.db",
 				},
+				Sensors: []SensorDef{validSensor},
 			},
+			wantErr: false,
 		},
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Expected error for missing NATS URL, got nil")
-	}
-}
-
-func TestValidate_InvalidDatabaseType(t *testing.T) {
-	cfg := &Config{
-		Environment: "test",
-		NATS: NATSConfig{
-			URL:     "nats://localhost:4222",
-			Timeout: 10 * time.Second,
-		},
-		Database: DatabaseConfig{
-			Type: "sqlite",
-			// Path missing
-		},
-		Sensors: []SensorDef{
-			{
-				ID:   "temp-001",
-				Type: sensor.SensorTypeTemperature,
-				Name: "Test",
-				Config: sensor.SensorConfig{
-					SensorID:  "temp-001",
-					Interval:  5000,
-					Threshold: 30.0,
-					Enabled:   true,
+		{
+			name: "missing environment",
+			config: &Config{
+				NATS: NATSConfig{
+					URL:     "nats://localhost:4222",
+					Timeout: 10 * time.Second,
 				},
+				Database: DatabaseConfig{
+					Type: "sqlite",
+					Path: "./test.db",
+				},
+				Sensors: []SensorDef{validSensor},
 			},
+			wantErr: true,
+		},
+		{
+			name: "missing NATS URL",
+			config: &Config{
+				Environment: "test",
+				NATS: NATSConfig{
+					Timeout: 10 * time.Second,
+				},
+				Database: DatabaseConfig{
+					Type: "sqlite",
+					Path: "./test.db",
+				},
+				Sensors: []SensorDef{validSensor},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing SQLite path",
+			config: &Config{
+				Environment: "test",
+				NATS: NATSConfig{
+					URL:     "nats://localhost:4222",
+					Timeout: 10 * time.Second,
+				},
+				Database: DatabaseConfig{
+					Type: "sqlite",
+					// Path missing
+				},
+				Sensors: []SensorDef{validSensor},
+			},
+			wantErr: true,
+		},
+		{
+			name: "no sensors configured",
+			config: &Config{
+				Environment: "test",
+				NATS: NATSConfig{
+					URL:     "nats://localhost:4222",
+					Timeout: 10 * time.Second,
+				},
+				Database: DatabaseConfig{
+					Type: "sqlite",
+					Path: "./test.db",
+				},
+				Sensors: []SensorDef{}, // Sin sensores
+			},
+			wantErr: true,
 		},
 	}
 
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Expected error for missing SQLite path, got nil")
-	}
-}
-
-func TestValidate_NoSensors(t *testing.T) {
-	cfg := &Config{
-		Environment: "test",
-		NATS: NATSConfig{
-			URL:     "nats://localhost:4222",
-			Timeout: 10 * time.Second,
-		},
-		Database: DatabaseConfig{
-			Type: "sqlite",
-			Path: "./test.db",
-		},
-		Sensors: []SensorDef{}, // Sin sensores
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Expected error for no sensors, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

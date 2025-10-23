@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/alejandro/technical_test_uvigo/internal/config"
+	"github.com/alejandro/technical_test_uvigo/internal/logger"
 	"github.com/alejandro/technical_test_uvigo/internal/repository"
 	"github.com/alejandro/technical_test_uvigo/internal/sensor"
 	natslib "github.com/nats-io/nats.go"
@@ -15,9 +15,11 @@ import (
 
 // Handler maneja las peticiones NATS relacionadas con sensores
 type Handler struct {
-	client    *Client
-	repo      repository.Repository
-	addSensor func(config.SensorDef) error // Callback para añadir sensores dinámicamente
+	client       *Client
+	repo         repository.Repository
+	addSensor    func(config.SensorDef) error            // Callback para añadir sensores dinámicamente
+	listSensors  func() []config.SensorDef               // Callback para listar todos los sensores
+	updateConfig func(string, sensor.SensorConfig) error // Callback para actualizar config de sensores
 }
 
 // NewHandler crea un nuevo handler con cliente NATS y repositorio
@@ -31,6 +33,16 @@ func NewHandler(client *Client, repo repository.Repository) *Handler {
 // SetAddSensorCallback configura el callback para añadir sensores dinámicamente
 func (h *Handler) SetAddSensorCallback(callback func(config.SensorDef) error) {
 	h.addSensor = callback
+}
+
+// SetListSensorsCallback configura el callback para listar sensores
+func (h *Handler) SetListSensorsCallback(callback func() []config.SensorDef) {
+	h.listSensors = callback
+}
+
+// SetUpdateConfigCallback configura el callback para actualizar la configuración de sensores
+func (h *Handler) SetUpdateConfigCallback(callback func(string, sensor.SensorConfig) error) {
+	h.updateConfig = callback
 }
 
 // HandleConfigRequests inicia los handlers para peticiones de configuración (GET y SET)
@@ -65,6 +77,14 @@ func (h *Handler) HandleConfigRequests() error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to sensor.register: %w", err)
+	}
+
+	// Handler para listar todos los sensores
+	_, err = h.client.Subscribe("sensor.list", func(msg *natslib.Msg) {
+		h.handleList(msg)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to sensor.list: %w", err)
 	}
 
 	return nil
@@ -122,6 +142,19 @@ func (h *Handler) handleConfigSet(msg *natslib.Msg) {
 	if err := h.repo.SaveConfig(context.Background(), &config); err != nil {
 		h.replyError(msg, fmt.Sprintf("failed to save config: %v", err))
 		return
+	}
+
+	// Actualizar la configuración en el simulador (si el callback está configurado)
+	if h.updateConfig != nil {
+		logger.Infof("[NATS Handler] Calling UpdateConfig for sensor %s", sensorID)
+		if err := h.updateConfig(sensorID, config); err != nil {
+			logger.Errorf("[NATS Handler] ERROR updating config: %v", err)
+			h.replyError(msg, fmt.Sprintf("failed to update simulator: %v", err))
+			return
+		}
+		logger.Infof("[NATS Handler] UpdateConfig successful for sensor %s", sensorID)
+	} else {
+		logger.Warn("[NATS Handler] WARNING: updateConfig callback is nil!")
 	}
 
 	// Responder con éxito
@@ -207,7 +240,13 @@ func (h *Handler) handleRegister(msg *natslib.Msg) {
 	// Asegurar que el sensor_id en config coincide
 	sensorDef.Config.SensorID = sensorDef.ID
 
-	// Añadir sensor
+	// Guardar configuración en el repositorio primero
+	if err := h.repo.SaveConfig(context.Background(), &sensorDef.Config); err != nil {
+		h.replyError(msg, fmt.Sprintf("failed to save config: %v", err))
+		return
+	}
+
+	// Añadir sensor al simulador
 	if err := h.addSensor(sensorDef); err != nil {
 		h.replyError(msg, fmt.Sprintf("failed to add sensor: %v", err))
 		return
@@ -223,6 +262,23 @@ func (h *Handler) handleRegister(msg *natslib.Msg) {
 	msg.Respond(data)
 }
 
+// handleList procesa peticiones para listar todos los sensores
+func (h *Handler) handleList(msg *natslib.Msg) {
+	if h.listSensors == nil {
+		h.replyError(msg, "sensor listing not configured")
+		return
+	}
+
+	sensors := h.listSensors()
+
+	data, err := json.Marshal(sensors)
+	if err != nil {
+		h.replyError(msg, "failed to marshal sensors")
+		return
+	}
+	msg.Respond(data)
+}
+
 // extractSensorID extrae el ID del sensor del subject NATS
 // Ejemplo: "sensor.config.get.temp-001" -> "temp-001"
 func extractSensorID(subject string) string {
@@ -231,16 +287,4 @@ func extractSensorID(subject string) string {
 		return ""
 	}
 	return parts[len(parts)-1]
-}
-
-// parseQueryLimit extrae el límite de una query string
-func parseQueryLimit(query string, defaultLimit int) int {
-	if query == "" {
-		return defaultLimit
-	}
-	limit, err := strconv.Atoi(query)
-	if err != nil || limit <= 0 {
-		return defaultLimit
-	}
-	return limit
 }
