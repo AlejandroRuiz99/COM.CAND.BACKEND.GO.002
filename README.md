@@ -5,14 +5,14 @@ Prueba técnica: Sistema de gestión de sensores IoT con mensajería NATS, worke
 ## 🚀 Quick Start
 
 ```bash
-# 1. Levantar el sistema
+# 1. Levantar el sistema (NATS + IoT Server)
 docker-compose up -d
 
-# 2. Ejecutar tests de integración
-docker-compose --profile test run --rm iot-tests
+# 2. Usar el CLI en modo interactivo
+docker-compose run --rm iot-cli
 
-# 3. Usar el CLI
-docker-compose run --rm iot-cli sensor list
+# 3. Ejecutar tests de integración (opcional)
+docker-compose --profile test run --rm iot-tests
 ```
 
 ## 📋 Tabla de Contenidos
@@ -28,7 +28,7 @@ docker-compose run --rm iot-cli sensor list
 
 - ✅ **Worker Pool Pattern** - Procesamiento escalable de sensores (5 workers, queue de 100 tareas)
 - ✅ **NATS Messaging** - Comunicación pub/sub y request/reply
-- ✅ **CLI Completo** - Gestión remota de sensores con Cobra
+- ✅ **CLI Interactivo** - Modo interactivo con gestión remota de sensores (Cobra)
 - ✅ **Persistencia SQLite** - Repository pattern para fácil migración
 - ✅ **Logging Estructurado** - Logrus con niveles y formatos configurables
 - ✅ **Hot Configuration** - Actualización de sensores sin reiniciar
@@ -94,7 +94,57 @@ docker-compose down
 docker-compose down -v
 ```
 
-### CLI - Gestión de Sensores
+### CLI Interactivo
+
+El CLI incluye un **modo interactivo** que te permite ejecutar comandos sin salir de la sesión:
+
+```bash
+# Levantar el CLI en modo interactivo
+docker-compose run --rm iot-cli
+```
+
+**Salida:**
+```
+╔═══════════════════════════════════════════════════════╗
+║      IoT CLI - Modo Interactivo                      ║
+╚═══════════════════════════════════════════════════════╝
+📡 Conectado a: nats://nats:4222
+
+Comandos disponibles:
+  sensor list
+  sensor register --type <type> --id <id>
+  config get <sensor-id>
+  config set <sensor-id> --enabled=true --interval=3000
+  readings latest <sensor-id> [limit]
+  help               - Mostrar ayuda
+  exit               - Salir del modo interactivo
+
+iot>
+```
+
+**Ejemplo de sesión:**
+```bash
+iot> sensor list
+📊 Sensores registrados (4):
+
+ID         Tipo         Nombre                             Intervalo  Threshold  Estado
+temp-001   temperature  Sensor Temperatura Sala Principal  5000ms     30.00      ✅ Habilitado
+
+iot> config set temp-001 --interval 3000 --threshold 35.0
+✅ Configuración del sensor 'temp-001' actualizada
+
+iot> sensor list
+📊 Sensores registrados (4):
+
+ID         Tipo         Nombre                             Intervalo  Threshold  Estado
+temp-001   temperature  Sensor Temperatura Sala Principal  3000ms     35.00      ✅ Habilitado
+
+iot> exit
+```
+
+### Comandos Individuales (Opcional)
+
+También puedes ejecutar comandos directamente sin entrar al modo interactivo:
 
 **Listar sensores:**
 ```bash
@@ -119,15 +169,10 @@ docker-compose run --rm iot-cli config set temp-001 \
 
 **Consultar lecturas:**
 ```bash
-docker-compose run --rm iot-cli readings temp-001
+docker-compose run --rm iot-cli readings latest temp-001 10
 ```
 
-**Modo interactivo:**
-```bash
-docker-compose run --rm iot-cli interactive
-```
-
-### CLI Local (Desarrollo)
+### Desarrollo Local
 
 Si tienes Go instalado y prefieres desarrollo local:
 
@@ -142,7 +187,10 @@ go build -o bin/iot-cli ./cmd/iot-cli
 # 3. Ejecutar servidor
 ./bin/iot-server
 
-# 4. Usar CLI (en otra terminal)
+# 4. Usar CLI en modo interactivo (en otra terminal)
+./bin/iot-cli interactive
+
+# O usar comandos directos
 ./bin/iot-cli sensor list
 ./bin/iot-cli config get temp-001
 ```
